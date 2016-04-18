@@ -1,0 +1,82 @@
+.b-page
+{
+    background-color: #fff;
+    font-family: sans-serif, Arial;
+    width: 100%;
+    margin:0;
+}
+.b-header
+{
+    background-color: #f4f4f4;
+    width:100%;
+    height: 100px;
+    margin: 0;
+}
+.b-box-shadow
+{
+
+    -moz-box-shadow: 0 4px 4px rgba(0, 0, 0, 0.2);
+    -webkit-box-shadow: 0 4px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 4px rgba(0, 0, 0, 0.2);
+}
+.b-header-bar
+{
+  width: 900px;
+  margin: 0 auto;
+  padding-top:56px;
+}
+.b-header-bar-nav
+{
+  float: right;
+}
+.b-header-bar-nav__item
+{
+    float:left;
+}
+.b-header-bar-nav__search-img
+{
+    width: 20px;
+    height: 20px;
+    background: transparent url("images/sp-bg.png") no-repeat scroll 0 0;
+    background-position: -92px 0px;
+
+}
+.b-header-bar-buttons
+{
+   float:left;
+}
+.button-margin-left
+{
+    margin-left: 10px;
+}
+.b-header-bar-buttons__button
+{
+    float: left;
+    color:#fff;
+    padding: 5px 10px;
+    background-color: #0271c7;
+}
+.b-header-bar-buttons__button:hover
+{
+    cursor: pointer;
+    background-color: #008dfa;
+}
+.b-border-radius
+{
+    -webkit-border-radius: 2px;
+    -moz-border-radius: 2px;
+    border-radius: 2px;
+}
+.b-box-shadow-2px
+{
+
+    -moz-box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4);
+    -webkit-box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4);
+}
+.b-page-calendar
+{
+    width:900px;
+    margin:0 auto;
+    margin-top:20px;
+}
