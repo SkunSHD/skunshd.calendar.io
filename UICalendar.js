@@ -1,20 +1,35 @@
 ﻿/**
+ * Доступность localStorage
+ */
+function localStorageAccess() {
+	try {
+		return 'localStorage' in window && window['localStorage'] !== null && localStorage != undefined;
+	} catch (e) {
+		console.log("localStorage недоступен");
+		return false;
+	}
+}
+
+/**
  * Создает экземпляр нового виджета календарь
  * @param {String} jquerySelector - css селектор DOM элемента, внутри которого расположится календарь
+ * @param multipleSelect - разрешение на мультивыборку (по умолчанию запрешена)
  * @param startYear - год отображения
  * @param startMonth - месяц отображения
  * @constructor
  * @attribute target - целевой JQuery объект
  * @attribute targetSelector - заданный селектор
  * @attribute events - ассоциативный массив событий
+ * @attribute ctrlKey - multi select возможность
  * @attribute firstMonthDate - отображаемая дата (год\месяц)
  * @attribute dateRange - выбранные даты
  * @attribute calendar - текущий календарь (месяцев,годов, дат)
  */
-function UICalendar(jquerySelector, calendarType, autoSwitch, startYear, startMonth) {
+function UICalendar(jquerySelector, multipleSelect, calendarType, autoSwitch, startYear, startMonth) {
     this.target = $(jquerySelector);
     this.targetSelector = jquerySelector;
 	this.events = [];
+    this.ctrlKey = multipleSelect;
 	this.mounth = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 	this.calendar;
 	this.daysDiv = $('<div class="ui-calendar-margin ui-calendar-padding"></div>');
@@ -23,6 +38,7 @@ function UICalendar(jquerySelector, calendarType, autoSwitch, startYear, startMo
 	this.autoSwitch = autoSwitch;
 	this.calendarListDiv = $("<div></div>");
 	this.dateRange;
+	// почему не выполняется функция ниже?
 	this.init();
 	
     switch (calendarType)
@@ -35,12 +51,228 @@ function UICalendar(jquerySelector, calendarType, autoSwitch, startYear, startMo
 		    this.calendar = new UICalendarDateProvider(this);
 		    break;
     }
+
+    if (startYear)
+    {
+        this.firstMonthDate.setYear(startYear);
+    }
+    if (startMonth)
+    {
+        this.firstMonthDate.setMonth(startMonth);
+    }
+
+    this.initEventsFromLocalStorage();
+    this.calendar.initValues();
+    this.selectedDates = [];
+
 }
+
+
+/**
+ * Возвращает выбранные даты
+ * @returns {Array}
+ */
+UICalendar.prototype.getSelectedDates = function () {
+	return this.selectedDates;
+};
+
+/**
+ * Перевод календаря к выбранной дате
+ * @param {Date} date - выбранная дата
+ */
+UICalendar.prototype.toDate = function(date)
+{
+	this.firstMonthDate = date;
+	this.firstMonthDate.setDate(1);
+	this.calendar = new UICalendarDateProvider(this);
+	this.calendar.initValues();
+}
+
+/**
+ * Возврашает массив событий определенного дня
+ * @param {Date} date - выбранный день
+ * @returns {Array} массив со всеми событиями выбранного дня
+ */
+UICalendar.prototype.getEvents = function(date)
+{
+	if (!date) return null;
+
+	var index = date.getFullYear()+"/"+date.getMonth()+"/"+date.getDate();
+
+	if (this.events[index])
+		return this.events[index];
+	else
+		return null;
+}
+
+/**
+ * Удаление событий в выбранной дате
+ * @param {Date} date - выбранная дата
+ */
+UICalendar.prototype.deleteEvents = function(date)
+{
+
+	var index = date.getFullYear()+"/"+date.getMonth()+"/"+date.getDate();
+
+	if (this.events[index])
+		delete this.events[index];
+
+	if (localStorageAccess())
+	{
+
+		localStorage.removeItem(index);
+	}
+}
+
+/**
+ * Обновление данных
+ */
+UICalendar.prototype.update = function()
+{
+	this.calendar.initValues();
+}
+
+/**
+ * Инициализация данных из localStorage
+ */
+UICalendar.prototype.initEventsFromLocalStorage = function()
+{
+   if (localStorageAccess())
+   {
+	   for (var i in localStorage)
+	   {
+		   //Выбираем только "свои"
+		   if (i.match(/[0-9]+\/[0-9]+\/[0-9]+/))
+		   {
+			   var event = JSON.parse(localStorage[i]);
+			   this.addEvents(event,new Date(event.year,event.month,event.day));
+			   //Уведомим флаг, что события загружены
+			   this.eventsInit = true;
+		   }
+	   }
+   }
+}
+
+/**
+ * Получить массив всех событий
+ * @returns {Array} Events - события, записанные в календаре
+ */
+UICalendar.prototype.getAllEvents = function()
+{
+	return this.events;
+}
+
+/**
+ * Добавляет события для выбранного (либо выделенных) дня\дней
+ * @param eventDescription - событие
+ * @param concreteDates - выбранный день
+ */
+UICalendar.prototype.addEvents = function(eventDescription, concreteDates)
+{
+	/**
+	 * Сохранение события в localStorage
+	 * @param event - событие
+	 */
+	var saveEventToLocalStorage = function(event)
+	{
+		if (localStorageAccess())
+		{
+			var index = event.year+"/"+event.month+"/"+event.day;
+			localStorage.setItem(index,JSON.stringify(event));
+		}
+	}
+
+	/**
+	 * Добавление события в массив событий
+	 * @param eventArray - массив событий
+	 * @param eventDescription - добавляемое событие
+	 * @param date - дата события
+	 */
+	var addEvent = function(eventArray,eventDescription,date)
+	{
+		var index = date.getFullYear()+"/"+date.getMonth()+"/"+date.getDate();
+		if (eventArray[index])
+		{
+			eventArray[index].push(eventDescription);
+		}
+		else
+		{
+			eventArray[index] = [eventDescription];
+
+		}
+		eventArray[index][eventArray[index].length-1].day = date.getDate();
+		eventArray[index][eventArray[index].length-1].month = date.getMonth();
+		eventArray[index][eventArray[index].length-1].year = date.getFullYear();
+		saveEventToLocalStorage(eventArray[index][eventArray[index].length-1]);
+	};
+
+	var dates =  concreteDates || this.selectedDates;
+	if (dates instanceof Array)
+	{
+		for(var i in dates)
+			addEvent(this.events,eventDescription,dates[i]);
+	}
+	else
+	{
+		this.deleteEvents(dates);
+		addEvent(this.events,eventDescription,dates);
+	}
+
+	this.calendar.initValues();
+
+};
+
+/**
+ * Очищение календаря
+ */
+UICalendar.prototype.clear = function()
+{
+  	$(".ui-calendar-select").removeClass('ui-calendar-select');
+	this.selectedDates = [];
+}
+
+/**
+ * Общая реакция для всех классов реакция на клик по дате\месяцу\году
+ * @param currentObject - календарь
+ * @param selectedDate - выбранная дата
+ * @param e - параметры клика
+ */
+UICalendar.prototype.dateClick = function(currentObject,selectedDate,e)
+{
+	//item уже был выбран
+	if ($(this).hasClass('ui-calendar-select'))
+	{
+		$(this).removeClass('ui-calendar-select');
+		for (var i = 0 ; i < currentObject.selectedDates.length; i++)
+		{
+			//удаляем его из массива выбранных
+			if (currentObject.selectedDates[i].toString() == selectedDate.toString())
+			{
+				currentObject.selectedDates.splice(i,1);
+			}
+
+		}
+	}
+	else
+	{   //Если не мульти-селект, затираем предыдущие значения
+		if (!e.ctrlKey || !currentObject.ctrlKey)
+		{
+			$(currentObject.targetSelector +" .ui-calendar-select").removeClass('ui-calendar-select');
+			currentObject.selectedDates = [];
+		}
+		//Добаляем новое
+		$(this).addClass('ui-calendar-select');
+		currentObject.selectedDates.push(selectedDate);
+	}
+}
+
 /**
  * Инициализация блока календаря (верхняя полоса, блоки)
  */
 UICalendar.prototype.init = function ()
-{
+{	
+	alert('init from protorype started');
+
 	//Верхний блок
 	var calendar = $("<div class='ui-calendar-font ui-calendar-div'></div>");
 	var calendarHead = $("<div class='ui-calendar-head ui-calendar-margin'></div>");
@@ -49,8 +281,8 @@ UICalendar.prototype.init = function ()
 	this.dateRange = this.autoSwitch?$("<div class='ui-calendar-daterange ui-calendar-daterange-clickable left-side'></div>"):$("<div class='ui-calendar-daterange left-side'></div>");
 	var today =   $("<div class='ui-calendar-cursor ui-calendar-today__button left-side'>Сегодня</div>");
 
-
-	calendarHead.append(leftSpan, this.dateRange, rightSpan, today,$("<div class=ui-calendar-clear></div>"));
+28
+	calendarHead.append(leftSpan, this.dateRange, rightSpan, today, $("<div class=ui-calendar-clear></div>"));
 
 	calendar.append(calendarHead);
 	this.target.append(calendar);
@@ -79,7 +311,6 @@ UICalendar.prototype.init = function ()
 
 		thisObject.calendar.initValues();
 	});
-
 };
 
 /**
@@ -110,11 +341,161 @@ Date.prototype.getDaysInMonth = function () {
 	return (new Date(this.getFullYear(), this.getMonth() + 1, 0)).getDate();
 };
 
+
+
+/**
+ * класс, определяющий методы для смены дат в календаре.
+ *
+ * определяет
+ *
+ * 1)Метод смены интервала выборки (move)
+ *
+ * 2) Инициализацию выбранных вариантов
+ *
+ * @constructor
+ */
 function UICalendarProvider()
 {
 	this.move = function(direction){};
 	this.initValues = function(){};
 };
+
+
+
+/**
+ * Работа с интервалом в 30 лет
+ * @param UICalendarItem - основной класс
+ * @constructor
+ */
+function UICalendarYearProvider(UICalendarItem)
+{
+	this.UICalendarItem = UICalendarItem;
+	this.UICalendarItem.daysDiv.html("");
+	this.UICalendarItem.daysDiv.append(this.UICalendarItem.calendarListDiv);
+
+	/**
+	 * Переход на другие 30 лет
+	 * @param {Number} direction - направление переход (-1 - предыдущий, 1 - следующий)
+	 */
+	this.move = function(direction)
+	{
+		this.UICalendarItem.selectedDates = [];
+		this.UICalendarItem.firstMonthDate.setYear(this.UICalendarItem.firstMonthDate.getFullYear()+direction*30);
+		this.initValues();
+	};
+
+	/**
+	 * Представление 30 лет, инициализация реакции нажатия на кнопку
+	 */
+	this.initValues = function()
+	{
+		this.UICalendarItem.calendarListDiv.html("");
+		var daysList = '<ol class="ui-calendar-list-mounth ui-calendar-list ui-calendar-list-up ui-calendar-font-white-color ui-calendar-text-left-side">';
+
+		this.UICalendarItem.dateRange.html(this.UICalendarItem.firstMonthDate.getFullYear() + "-" + (this.UICalendarItem.firstMonthDate.getFullYear() + 30) );
+
+		for (var i = 0; i < 30 ; i++) {
+			daysList += "<li class='left-side ui-calendar-cursor ui-calendar-list-item  ui-calendar-selectable'>"+(this.UICalendarItem.firstMonthDate.getFullYear()+i)+"</li>";
+		}
+		daysList += '</ol><div class=ui-calendar-clear></div>';
+		this.UICalendarItem.calendarListDiv.append($(daysList));
+
+		var currentObject = this.UICalendarItem;
+
+		/**
+		 * Реакция на выбор даты. (выбор даты, сброс значений) Формирование массива выбранных дат
+		 */
+		$(this.UICalendarItem.targetSelector + " .ui-calendar-list-mounth li").bind("click",function(e)
+		{
+			currentObject.event = 0;
+
+			var selectedDate = new Date($(this).html(),0,1);
+			if (currentObject.autoSwitch)
+			{
+				currentObject.firstMonthDate.setFullYear($(this).html());
+				currentObject.calendar = new UICalendarMonthProvider(currentObject);
+				currentObject.calendar.initValues();
+				return;
+			}
+			currentObject.dateClick.call(this,currentObject,selectedDate,e);
+		});
+	}
+}
+
+UICalendarYearProvider.prototype = new UICalendar();
+UICalendarYearProvider.prototype.constructor = UICalendarYearProvider;
+
+/**
+ * Работа с интервалом в год (выбор месяца)
+ * @param UICalendarItem - основной класс
+ * @constructor
+ */
+function UICalendarMonthProvider(UICalendarItem)
+{
+	this.UICalendarItem = UICalendarItem;
+	this.UICalendarItem.daysDiv.html("");
+	this.UICalendarItem.daysDiv.append(this.UICalendarItem.calendarListDiv);
+
+	var currentObject = UICalendarItem;
+	/**
+	 * При нажатии на верхний интервал - переход в выборке более объемной (с даты на месяц, с месяца на год)
+	 */
+	$(".ui-calendar-daterange-clickable").bind("click keypress",function()
+	{
+		currentObject.calendar = new UICalendarYearProvider(currentObject);
+		currentObject.calendar.initValues();
+	});
+	/**
+	 * Переход на другой год
+	 * @param {Number} direction - направление переход (-1 - предыдущий, 1 - следующий)
+	 */
+	this.move = function(direction)
+	{
+		this.UICalendarItem.selectedDates = [];
+		this.UICalendarItem.firstMonthDate.setYear(this.UICalendarItem.firstMonthDate.getFullYear()+direction);
+		this.initValues();
+	}
+	/**
+	 * Вывод месяцев в году. Возможность выбора
+	 */
+	this.initValues = function()
+	{
+		this.UICalendarItem.calendarListDiv.html("");
+		var daysList = '<ol class="ui-calendar-list-mounth ui-calendar-list ui-calendar-list-up ui-calendar-font-white-color ui-calendar-text-left-side">';
+		var startMounthDay = this.UICalendarItem.firstMonthDate;
+		this.UICalendarItem.dateRange.html(this.UICalendarItem.firstMonthDate.getFullYear());
+
+		//Инициализация месяцев в году. Вычисляем нужный месяц по аттрибуту index
+		for (var i = 0; i < this.UICalendarItem.mounth.length ; i++) {
+			daysList += "<li class='left-side ui-calendar-cursor ui-calendar-list-item  ui-calendar-selectable' index="+i+">"+this.UICalendarItem.mounth[i]+"</li>";
+		}
+		daysList += '</ol><div class=ui-calendar-clear></div>';
+		this.UICalendarItem.calendarListDiv.append($(daysList));
+
+		var currentObject = this.UICalendarItem;
+
+		/**
+		 * Реакция на выбор даты. (выбор даты, сброс значений) Формирование массива выбранных дат
+		 */
+		$(this.UICalendarItem.targetSelector + " .ui-calendar-list-mounth li").bind("click",function(e)
+		{
+			currentObject.event = 0;
+
+			var selectedDate = new Date(currentObject.firstMonthDate.getFullYear(),$(this).attr("index"),1);
+			if (currentObject.autoSwitch)
+			{
+				currentObject.firstMonthDate.setMonth($(this).attr("index"));
+				currentObject.calendar = new UICalendarDateProvider(currentObject);
+				currentObject.calendar.initValues();
+				return;
+			}
+			currentObject.dateClick.call(this,currentObject,selectedDate,e);
+		});
+	}
+}
+
+UICalendarMonthProvider.prototype = new UICalendarProvider();
+UICalendarMonthProvider.prototype.constructor = UICalendarMonthProvider;
 
 /**
  * Выбор даты (интервал в месяц)
@@ -235,8 +616,8 @@ function UICalendarDateProvider(UICalendarItem)
 			var selectedDate = new Date(currentObject.firstMonthDate.getFullYear(),currentObject.firstMonthDate.getMonth(), parseInt($(this).html()));
 
 			currentObject.dateClick.call(this,currentObject,selectedDate,e);
+
 		});
-		
 	}
 }
 
